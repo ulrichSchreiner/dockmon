@@ -1,6 +1,7 @@
 package main
 
 import (
+	"flag"
 	"fmt"
 	"log"
 	"sort"
@@ -13,6 +14,7 @@ import (
 )
 
 var (
+	dockersocket          = flag.String("docker", "unix:///var/run/docker.sock", "the socket of the docker daemon")
 	allcontainers         []dockerclient.Container
 	containerDetailsIndex = 0
 	containerDetailsId    = ""
@@ -197,6 +199,8 @@ func cpuPercent(stats []*dockerclient.Stats, idx int) int {
 }
 
 func main() {
+	flag.Parse()
+
 	err := ui.Init()
 	if err != nil {
 		panic(err)
@@ -204,7 +208,10 @@ func main() {
 	defer ui.Close()
 
 	// Init the client
-	docker, _ := dockerclient.NewDockerClient("unix:///var/run/docker.sock", nil)
+	docker, err := dockerclient.NewDockerClient(*dockersocket, nil)
+	if err != nil {
+		panic(err)
+	}
 
 	var drawers []DockerDrawer
 	containerlist, uiCntList := ContainerList()
