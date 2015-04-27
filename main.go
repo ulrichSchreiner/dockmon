@@ -179,6 +179,35 @@ func ContainerCpu() (DockerDrawer, ui.GridBufferer) {
 	}, cpus
 }
 
+func ContainerMemory() (DockerDrawer, ui.GridBufferer) {
+	mem := ui.NewMBarChart()
+	mem.Border.Label = "Memory usage (red=used, green=free)"
+	mem.Height = 20
+	mem.BarWidth = 5
+	mem.BarColor[0] = ui.ColorRed
+	mem.BarColor[1] = ui.ColorGreen
+	return func(dc *dockerclient.DockerClient) {
+		var labels []string
+		var used []int
+		var free []int
+		for i, c := range allcontainers {
+			labels = append(labels, fmt.Sprintf("[%d]", i))
+			dat, _ := statsData[c.Id]
+			if len(dat) > 1 {
+				last := dat[len(dat)-1]
+				memused := last.MemoryStats.Usage
+				memlim := last.MemoryStats.Limit
+				memusedP := int(100 * memused / memlim)
+				used = append(used, memusedP)
+				free = append(free, 100-memusedP)
+			}
+		}
+		mem.DataLabels = labels
+		mem.Data[0] = used
+		mem.Data[1] = free
+	}, mem
+}
+
 func genCPUSystemUsage(stats []*dockerclient.Stats) []int {
 	var res []int
 	for i, _ := range stats {
@@ -223,8 +252,9 @@ func main() {
 	containerlist, uiCntList := ContainerList()
 	containerDetails, uiCntDets := ContainerDetails()
 	cpuList, uiCpus := ContainerCpu()
+	memUsg, uiMem := ContainerMemory()
 
-	drawers = append(drawers, containerlist, containerDetails, cpuList)
+	drawers = append(drawers, containerlist, containerDetails, cpuList, memUsg)
 
 	title := ui.NewPar("dockmon (press 'q' to quit)")
 	title.Height = 3
@@ -237,7 +267,9 @@ func main() {
 			ui.NewCol(4, 0, uiCntList),
 			ui.NewCol(8, 0, uiCntDets)),
 		ui.NewRow(
-			ui.NewCol(12, 0, uiCpus)))
+			ui.NewCol(12, 0, uiCpus)),
+		ui.NewRow(
+			ui.NewCol(6, 0, uiMem)))
 
 	// calculate layout
 	ui.Body.Align()
