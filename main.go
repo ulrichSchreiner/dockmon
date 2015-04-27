@@ -93,6 +93,7 @@ func ContainerDetails() (DockerDrawer, ui.GridBufferer) {
 	list.Border.Label = "Details"
 	return func(dc *dockerclient.DockerClient) {
 		if containerDetailsId == "" {
+			list.Height = 2
 			return
 		}
 		ci, err := dc.InspectContainer(containerDetailsId)
