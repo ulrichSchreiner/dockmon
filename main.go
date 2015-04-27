@@ -48,7 +48,6 @@ func ContainerList() (DockerDrawer, ui.GridBufferer) {
 		if err != nil {
 			containerDetailsId = ""
 			dc.StopAllMonitorStats()
-			//log.Printf(err.Error())
 		} else {
 			var conts []string
 			newstats := make(map[string][]*dockerclient.Stats)
@@ -98,7 +97,7 @@ func ContainerDetails() (DockerDrawer, ui.GridBufferer) {
 		}
 		ci, err := dc.InspectContainer(containerDetailsId)
 		if err != nil {
-			//log.Printf(err.Error())
+			// don't log !
 		} else {
 			var lines []string
 			lines = append(lines, fmt.Sprintf("Name: %s", ci.Name))
