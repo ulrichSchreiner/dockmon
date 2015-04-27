@@ -182,7 +182,7 @@ func ContainerCpu() (DockerDrawer, ui.GridBufferer) {
 func ContainerMemory() (DockerDrawer, ui.GridBufferer) {
 	mem := ui.NewMBarChart()
 	mem.Border.Label = "Memory usage (red=used, green=free)"
-	mem.Height = 20
+	mem.Height = 23
 	mem.BarWidth = 5
 	mem.BarColor[0] = ui.ColorRed
 	mem.BarColor[1] = ui.ColorGreen
