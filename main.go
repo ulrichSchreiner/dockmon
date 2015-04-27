@@ -3,7 +3,6 @@ package main
 import (
 	"flag"
 	"fmt"
-	"log"
 	"sort"
 	"strings"
 	"sync"
@@ -47,7 +46,9 @@ func ContainerList() (DockerDrawer, ui.GridBufferer) {
 	return func(dc *dockerclient.DockerClient) {
 		containers, err := dc.ListContainers(false, false, "")
 		if err != nil {
-			log.Printf(err.Error())
+			containerDetailsId = ""
+			dc.StopAllMonitorStats()
+			//log.Printf(err.Error())
 		} else {
 			var conts []string
 			newstats := make(map[string][]*dockerclient.Stats)
@@ -68,6 +69,10 @@ func ContainerList() (DockerDrawer, ui.GridBufferer) {
 			defer lock.Unlock()
 			statsData = newstats
 			allcontainers = containers
+			if len(allcontainers) == 0 {
+				dc.StopAllMonitorStats()
+				containerDetailsId = ""
+			}
 			list.Items = conts
 			list.Height = len(conts) + 2
 		}
@@ -92,7 +97,7 @@ func ContainerDetails() (DockerDrawer, ui.GridBufferer) {
 		}
 		ci, err := dc.InspectContainer(containerDetailsId)
 		if err != nil {
-			log.Printf(err.Error())
+			//log.Printf(err.Error())
 		} else {
 			var lines []string
 			lines = append(lines, fmt.Sprintf("Name: %s", ci.Name))
