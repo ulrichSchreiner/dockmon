@@ -3,6 +3,7 @@ package main
 import (
 	"fmt"
 	"log"
+	"sort"
 	"strings"
 	"sync"
 	"time"
@@ -120,15 +121,28 @@ func ContainerDetails() (DockerDrawer, ui.GridBufferer) {
 
 func genPortMappings(di *dockerclient.ContainerInfo) string {
 	var res []string
-	for p, pc := range di.NetworkSettings.Ports {
-		res = append(res, fmt.Sprintf("%s -> %s ", p, pc))
+	var keys []string
+	for p, _ := range di.NetworkSettings.Ports {
+		keys = append(keys, p)
 	}
+	sort.Strings(keys)
+	for _, k := range keys {
+		pc := di.NetworkSettings.Ports[k]
+		res = append(res, fmt.Sprintf("%s -> %s ", k, pc))
+	}
+
 	return strings.Join(res, ",")
 }
 
 func genVolumes(di *dockerclient.ContainerInfo) []string {
 	var res []string
-	for k, v := range di.Volumes {
+	var keys []string
+	for v, _ := range di.Volumes {
+		keys = append(keys, v)
+	}
+	sort.Strings(keys)
+	for _, k := range keys {
+		v := di.Volumes[k]
 		res = append(res, fmt.Sprintf("%s -> %s ", k, v))
 	}
 	return res
