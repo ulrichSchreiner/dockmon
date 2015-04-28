@@ -12,6 +12,14 @@ import (
 	"github.com/samalba/dockerclient"
 )
 
+const (
+	kb      = 1024
+	mb      = kb * 1024
+	gb      = mb * 1024
+	tb      = gb * 1024
+	version = "0.1"
+)
+
 var (
 	dockersocket          = flag.String("docker", "unix:///var/run/docker.sock", "the socket of the docker daemon")
 	allcontainers         []dockerclient.Container
@@ -23,6 +31,8 @@ var (
 )
 
 type DockerDrawer func(*dockerclient.DockerClient)
+
+type NetworkDiffer func(cur *dockerclient.NetworkStats, prev *dockerclient.NetworkStats) int
 
 func dockerStats(id string, stats *dockerclient.Stats, errs chan error, data ...interface{}) {
 	lock.Lock()
@@ -170,18 +180,45 @@ func ContainerCpu() (DockerDrawer, ui.GridBufferer) {
 			}
 			l := ui.NewSparkline()
 			l.Title = fmt.Sprintf("[%d %%] %s:%s ", lastVal, c.Names, c.Id)
-			l.LineColor = ui.ColorRed
+			l.LineColor = ui.ColorYellow
 			l.Data = genCPUSystemUsage(dat)
+			l.Height = 2
 			cpus.Lines = append(cpus.Lines, l)
-			cpus.Height = cpus.Height + 2
+			cpus.Height = cpus.Height + 3
 		}
 
 	}, cpus
 }
 
-func ContainerMemory() (DockerDrawer, ui.GridBufferer) {
+func ContainerNetworkBytes(lbl string, differ NetworkDiffer, color ui.Attribute) (DockerDrawer, ui.GridBufferer) {
+	netw := ui.NewSparklines()
+	netw.Border.Label = lbl
+	return func(dc *dockerclient.DockerClient) {
+		netw.Lines = []ui.Sparkline{}
+		netw.Height = 2
+		for idx, c := range allcontainers {
+			dat, _ := statsData[c.Id]
+			if len(dat) > 1 {
+				l := ui.NewSparkline()
+				l.LineColor = color
+				l.Data = genNetwork(dat, differ)
+				tx := 0
+				if len(l.Data) > 0 {
+					tx = l.Data[len(l.Data)-1]
+				}
+				l.Title = fmt.Sprintf("[%5s] %s", memAsString(uint64(tx)), genContainerListName(idx, c, 20))
+				l.Height = 2
+				netw.Lines = append(netw.Lines, l)
+				netw.Height = netw.Height + 3
+			}
+		}
+
+	}, netw
+}
+
+func ContainerPercentMemory() (DockerDrawer, ui.GridBufferer) {
 	mem := ui.NewBarChart()
-	mem.Border.Label = "Memory usage "
+	mem.Border.Label = "Memory % usage "
 	mem.Height = 23
 	mem.BarWidth = 5
 	mem.SetMax(100)
@@ -205,6 +242,27 @@ func ContainerMemory() (DockerDrawer, ui.GridBufferer) {
 	}, mem
 }
 
+func ContainerValueMemory() (DockerDrawer, ui.GridBufferer) {
+	list := ui.NewList()
+	list.ItemFgColor = ui.ColorYellow
+	list.Border.Label = "Container Memory"
+
+	return func(dc *dockerclient.DockerClient) {
+		var labels []string
+		for i, c := range allcontainers {
+			dat, _ := statsData[c.Id]
+			var memused uint64
+			if len(dat) > 1 {
+				last := dat[len(dat)-1]
+				memused = last.MemoryStats.Usage
+			}
+			labels = append(labels, fmt.Sprintf("[%2d]: %s", i, memAsString(memused)))
+		}
+		list.Items = labels
+		list.Height = len(labels) + 2
+	}, list
+}
+
 func genCPUSystemUsage(stats []*dockerclient.Stats) []int {
 	var res []int
 	for i, _ := range stats {
@@ -213,6 +271,25 @@ func genCPUSystemUsage(stats []*dockerclient.Stats) []int {
 		}
 	}
 	return res
+}
+
+func genNetwork(stats []*dockerclient.Stats, differ NetworkDiffer) []int {
+	var res []int
+	for i, _ := range stats {
+		if i > 0 {
+			stat1 := stats[i]
+			stat2 := stats[i-1]
+			res = append(res, differ(&stat1.NetworkStats, &stat2.NetworkStats))
+		}
+	}
+	return res
+}
+
+func rxDiffer(cur *dockerclient.NetworkStats, prev *dockerclient.NetworkStats) int {
+	return int(cur.RxBytes - prev.RxBytes)
+}
+func txDiffer(cur *dockerclient.NetworkStats, prev *dockerclient.NetworkStats) int {
+	return int(cur.TxBytes - prev.TxBytes)
 }
 
 func cpuPercent(stats []*dockerclient.Stats, idx int) int {
@@ -228,6 +305,26 @@ func cpuPercent(stats []*dockerclient.Stats, idx int) int {
 		p = (cpudelta / sysdelta) * float64(len(mystat.CpuStats.CpuUsage.PercpuUsage)) * 100.0
 	}
 	return int(p)
+}
+
+func memAsString(val uint64) string {
+	if val >= tb {
+		tval := int(val / tb)
+		return fmt.Sprintf("%dtb", tval)
+	}
+	if val >= gb {
+		gval := int(val / gb)
+		return fmt.Sprintf("%dgb", gval)
+	}
+	if val >= mb {
+		mval := int(val / mb)
+		return fmt.Sprintf("%dmb", mval)
+	}
+	if val >= kb {
+		kval := int(val / kb)
+		return fmt.Sprintf("%dkb", kval)
+	}
+	return fmt.Sprintf("%db", val)
 }
 
 func main() {
@@ -249,15 +346,18 @@ func main() {
 	containerlist, uiCntList := ContainerList()
 	containerDetails, uiCntDets := ContainerDetails()
 	cpuList, uiCpus := ContainerCpu()
-	memUsg, uiMem := ContainerMemory()
+	memUsg, uiMem := ContainerPercentMemory()
+	memVal, uiMemVal := ContainerValueMemory()
+	rxVal, uiRx := ContainerNetworkBytes("Rx Bytes", rxDiffer, ui.ColorGreen)
+	txVal, uiTx := ContainerNetworkBytes("Tx Bytes", txDiffer, ui.ColorBlue)
 
-	drawers = append(drawers, containerlist, containerDetails, cpuList, memUsg)
+	drawers = append(drawers, containerlist, containerDetails, cpuList, memUsg, memVal, rxVal, txVal)
 
-	title := ui.NewPar("dockmon ('q' to quit panel)")
+	title := ui.NewPar(fmt.Sprintf("dockmon %s ('q' to quit panel)", version))
 	title.Height = 3
 	title.HasBorder = true
 
-	mainGrid := mainPanel(title, uiCntList, uiCpus, uiMem)
+	mainGrid := mainPanel(title, uiCntList, uiCpus, uiMem, uiMemVal, uiRx, uiTx)
 	detailsGrid := detailsPanel(title, uiCntDets)
 
 	ui.Body = pushPanel(mainGrid)
@@ -314,17 +414,20 @@ func popPanel() (*ui.Grid, error) {
 	return last, nil
 }
 
-func mainPanel(title, cntList, cpus, mem ui.GridBufferer) *ui.Grid {
+func mainPanel(title, cntList, cpus, mem, memval, rx, tx ui.GridBufferer) *ui.Grid {
 	p := &ui.Grid{}
 
 	p.AddRows(
 		ui.NewRow(
 			ui.NewCol(12, 0, title)),
 		ui.NewRow(
-			ui.NewCol(4, 0, cntList),
-			ui.NewCol(6, 0, mem)),
+			ui.NewCol(3, 0, cntList),
+			ui.NewCol(6, 0, mem),
+			ui.NewCol(3, 0, memval)),
 		ui.NewRow(
-			ui.NewCol(12, 0, cpus)))
+			ui.NewCol(6, 0, cpus),
+			ui.NewCol(3, 0, rx),
+			ui.NewCol(3, 0, tx)))
 
 	return p
 }
