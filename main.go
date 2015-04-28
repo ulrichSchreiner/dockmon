@@ -43,7 +43,7 @@ func dockerStats(id string, stats *dockerclient.Stats, errs chan error, data ...
 func ContainerList() (DockerDrawer, ui.GridBufferer) {
 	list := ui.NewList()
 	list.ItemFgColor = ui.ColorYellow
-	list.Border.Label = "Containers"
+	list.Border.Label = "Containers (#num for details)"
 	return func(dc *dockerclient.DockerClient) {
 		containers, err := dc.ListContainers(false, false, "")
 		if err != nil {
