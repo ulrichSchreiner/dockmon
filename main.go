@@ -219,7 +219,7 @@ func ContainerNetworkBytes(lbl string, differ NetworkDiffer, color ui.Attribute)
 func ContainerPercentMemory() (DockerDrawer, ui.GridBufferer) {
 	mem := ui.NewBarChart()
 	mem.Border.Label = "Memory % usage "
-	mem.Height = 23
+	mem.Height = 13
 	mem.BarWidth = 5
 	mem.SetMax(100)
 	mem.BarColor = ui.ColorRed
