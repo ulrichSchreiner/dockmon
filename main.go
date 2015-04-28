@@ -18,8 +18,8 @@ var (
 	containerDetailsIndex = 0
 	containerDetailsId    = ""
 	statsData             = make(map[string][]*dockerclient.Stats)
-	columns               = 0
 	lock                  sync.Mutex
+	uiStack               []*ui.Grid
 )
 
 type DockerDrawer func(*dockerclient.DockerClient)
@@ -28,7 +28,8 @@ func dockerStats(id string, stats *dockerclient.Stats, errs chan error, data ...
 	lock.Lock()
 	defer lock.Unlock()
 	dat, _ := statsData[id]
-	if len(dat) > (columns - 2) {
+	// if we have more stats than visible columns in console, scroll.
+	if len(dat) > (ui.Body.Width - 2) {
 		dat = dat[1:]
 	}
 	if len(dat) > 0 && dat[len(dat)-1].Read == stats.Read {
@@ -179,18 +180,17 @@ func ContainerCpu() (DockerDrawer, ui.GridBufferer) {
 }
 
 func ContainerMemory() (DockerDrawer, ui.GridBufferer) {
-	mem := ui.NewMBarChart()
-	mem.Border.Label = "Memory usage (red=used, green=free)"
+	mem := ui.NewBarChart()
+	mem.Border.Label = "Memory usage "
 	mem.Height = 23
 	mem.BarWidth = 5
-	mem.BarColor[0] = ui.ColorRed
-	mem.BarColor[1] = ui.ColorGreen
+	mem.SetMax(100)
+	mem.BarColor = ui.ColorRed
 	return func(dc *dockerclient.DockerClient) {
 		var labels []string
 		var used []int
-		var free []int
 		for i, c := range allcontainers {
-			labels = append(labels, fmt.Sprintf("[%d]", i))
+			labels = append(labels, fmt.Sprintf("[%2d]", i))
 			dat, _ := statsData[c.Id]
 			if len(dat) > 1 {
 				last := dat[len(dat)-1]
@@ -198,12 +198,10 @@ func ContainerMemory() (DockerDrawer, ui.GridBufferer) {
 				memlim := last.MemoryStats.Limit
 				memusedP := int(100 * memused / memlim)
 				used = append(used, memusedP)
-				free = append(free, 100-memusedP)
 			}
 		}
 		mem.DataLabels = labels
-		mem.Data[0] = used
-		mem.Data[1] = free
+		mem.Data = used
 	}, mem
 }
 
@@ -255,24 +253,16 @@ func main() {
 
 	drawers = append(drawers, containerlist, containerDetails, cpuList, memUsg)
 
-	title := ui.NewPar("dockmon (press 'q' to quit)")
+	title := ui.NewPar("dockmon ('q' to quit panel)")
 	title.Height = 3
 	title.HasBorder = true
 
-	ui.Body.AddRows(
-		ui.NewRow(
-			ui.NewCol(12, 0, title)),
-		ui.NewRow(
-			ui.NewCol(4, 0, uiCntList),
-			ui.NewCol(8, 0, uiCntDets)),
-		ui.NewRow(
-			ui.NewCol(12, 0, uiCpus)),
-		ui.NewRow(
-			ui.NewCol(6, 0, uiMem)))
+	mainGrid := mainPanel(title, uiCntList, uiCpus, uiMem)
+	detailsGrid := detailsPanel(title, uiCntDets)
 
-	// calculate layout
+	ui.Body = pushPanel(mainGrid)
+	ui.Body.Width = ui.TermWidth()
 	ui.Body.Align()
-	columns = ui.Body.Width
 
 	evt := ui.EventCh()
 
@@ -280,10 +270,14 @@ func main() {
 		select {
 		case e := <-evt:
 			if e.Type == ui.EventKey && e.Ch == 'q' {
-				return
+				_, err := popPanel()
+				if err != nil {
+					return
+				}
 			}
 			if e.Type == ui.EventKey && e.Ch >= '0' && e.Ch <= '9' {
 				containerDetailsIndex = int(e.Ch - '0')
+				pushPanel(detailsGrid)
 			}
 			if e.Type == ui.EventResize {
 				ui.Body.Width = ui.TermWidth()
@@ -294,9 +288,55 @@ func main() {
 				d(docker)
 			}
 			ui.Body.Align()
-			columns = ui.Body.Width
 			ui.Render(ui.Body)
 			time.Sleep(time.Second / 2)
 		}
 	}
+}
+
+func pushPanel(p *ui.Grid) *ui.Grid {
+	uiStack = append(uiStack, p)
+	ui.Body = p
+	ui.Body.Width = ui.TermWidth()
+	ui.Body.Align()
+	return p
+}
+
+func popPanel() (*ui.Grid, error) {
+	if len(uiStack) < 2 {
+		return nil, fmt.Errorf("no more panels in stack")
+	}
+	_, uiStack = uiStack[len(uiStack)-1], uiStack[:len(uiStack)-1]
+	last := uiStack[len(uiStack)-1]
+	ui.Body = last
+	ui.Body.Width = ui.TermWidth()
+	ui.Body.Align()
+	return last, nil
+}
+
+func mainPanel(title, cntList, cpus, mem ui.GridBufferer) *ui.Grid {
+	p := &ui.Grid{}
+
+	p.AddRows(
+		ui.NewRow(
+			ui.NewCol(12, 0, title)),
+		ui.NewRow(
+			ui.NewCol(4, 0, cntList),
+			ui.NewCol(6, 0, mem)),
+		ui.NewRow(
+			ui.NewCol(12, 0, cpus)))
+
+	return p
+}
+
+func detailsPanel(title, details ui.GridBufferer) *ui.Grid {
+	p := &ui.Grid{}
+
+	p.AddRows(
+		ui.NewRow(
+			ui.NewCol(12, 0, title)),
+		ui.NewRow(
+			ui.NewCol(12, 0, details)))
+
+	return p
 }
