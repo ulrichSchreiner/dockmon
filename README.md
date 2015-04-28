@@ -17,4 +17,4 @@ Container Details:
 
 ## Limitations
 
-This is a 0.1 version; only CPU and simple memory stat is rendered. Other data will follow.
+This is a 0.1 version don't expect too much :-)
