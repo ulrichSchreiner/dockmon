@@ -3,7 +3,11 @@
 `dockmon` visualizes the docker runtime statistics of running docker containers.
 You must have docker >=1.6 installed.
 
-![CPU Data](doc/screenshot1.png)
+Responsive Runtime Data:
+
+![Runtime Data](doc/screenshot1.png)
+
+Container Details:
 
 ![Memory Data](doc/screenshot2.png)
 
