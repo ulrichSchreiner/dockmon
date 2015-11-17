@@ -6,7 +6,6 @@ import (
 	"sort"
 	"strings"
 	"sync"
-	"time"
 
 	ui "github.com/gizak/termui"
 	"github.com/samalba/dockerclient"
@@ -24,15 +23,15 @@ var (
 	dockersocket          = flag.String("docker", "unix:///var/run/docker.sock", "the socket of the docker daemon")
 	allcontainers         []dockerclient.Container
 	containerDetailsIndex = 0
-	containerDetailsId    = ""
+	containerDetailsID    = ""
 	statsData             = make(map[string][]*dockerclient.Stats)
 	lock                  sync.Mutex
 	uiStack               []*ui.Grid
 )
 
-type DockerDrawer func(*dockerclient.DockerClient)
+type dockerDrawer func(*dockerclient.DockerClient)
 
-type NetworkDiffer func(cur *dockerclient.NetworkStats, prev *dockerclient.NetworkStats) int
+type networkDiffer func(cur *dockerclient.NetworkStats, prev *dockerclient.NetworkStats) int
 
 func dockerStats(id string, stats *dockerclient.Stats, errs chan error, data ...interface{}) {
 	lock.Lock()
@@ -50,14 +49,14 @@ func dockerStats(id string, stats *dockerclient.Stats, errs chan error, data ...
 	statsData[id] = dat
 }
 
-func ContainerList() (DockerDrawer, ui.GridBufferer) {
+func containerList() (dockerDrawer, ui.GridBufferer) {
 	list := ui.NewList()
 	list.ItemFgColor = ui.ColorYellow
-	list.Border.Label = "Containers (#num for details)"
+	list.BorderLabel = "Containers (#num for details)"
 	return func(dc *dockerclient.DockerClient) {
 		containers, err := dc.ListContainers(false, false, "")
 		if err != nil {
-			containerDetailsId = ""
+			containerDetailsID = ""
 			dc.StopAllMonitorStats()
 		} else {
 			var conts []string
@@ -65,7 +64,7 @@ func ContainerList() (DockerDrawer, ui.GridBufferer) {
 			for i, c := range containers {
 				conts = append(conts, genContainerListName(i, c, 30))
 				if i == containerDetailsIndex {
-					containerDetailsId = c.Id
+					containerDetailsID = c.Id
 				}
 				stat, ok := statsData[c.Id]
 				if ok {
@@ -81,7 +80,7 @@ func ContainerList() (DockerDrawer, ui.GridBufferer) {
 			allcontainers = containers
 			if len(allcontainers) == 0 {
 				dc.StopAllMonitorStats()
-				containerDetailsId = ""
+				containerDetailsID = ""
 			}
 			list.Items = conts
 			list.Height = len(conts) + 2
@@ -97,16 +96,16 @@ func genContainerListName(idx int, c dockerclient.Container, maxlen int) string 
 	return s
 }
 
-func ContainerDetails() (DockerDrawer, ui.GridBufferer) {
+func containerDetails() (dockerDrawer, ui.GridBufferer) {
 	list := ui.NewList()
 	list.ItemFgColor = ui.ColorYellow
-	list.Border.Label = "Details"
+	list.BorderLabel = "Details"
 	return func(dc *dockerclient.DockerClient) {
-		if containerDetailsId == "" {
+		if containerDetailsID == "" {
 			list.Height = 2
 			return
 		}
-		ci, err := dc.InspectContainer(containerDetailsId)
+		ci, err := dc.InspectContainer(containerDetailsID)
 		if err != nil {
 			// don't log !
 		} else {
@@ -132,7 +131,7 @@ func ContainerDetails() (DockerDrawer, ui.GridBufferer) {
 			lines = append(lines, fmt.Sprintf("Env: %s", ci.Config.Env))
 			list.Items = lines
 			list.Height = len(lines) + 2
-			list.Border.Label = fmt.Sprintf("Details: %s", ci.Name)
+			list.BorderLabel = fmt.Sprintf("Details: %s", ci.Name)
 		}
 	}, list
 }
@@ -140,7 +139,7 @@ func ContainerDetails() (DockerDrawer, ui.GridBufferer) {
 func genPortMappings(di *dockerclient.ContainerInfo) string {
 	var res []string
 	var keys []string
-	for p, _ := range di.NetworkSettings.Ports {
+	for p := range di.NetworkSettings.Ports {
 		keys = append(keys, p)
 	}
 	sort.Strings(keys)
@@ -155,7 +154,7 @@ func genPortMappings(di *dockerclient.ContainerInfo) string {
 func genVolumes(di *dockerclient.ContainerInfo) []string {
 	var res []string
 	var keys []string
-	for v, _ := range di.Volumes {
+	for v := range di.Volumes {
 		keys = append(keys, v)
 	}
 	sort.Strings(keys)
@@ -166,9 +165,9 @@ func genVolumes(di *dockerclient.ContainerInfo) []string {
 	return res
 }
 
-func ContainerCpu() (DockerDrawer, ui.GridBufferer) {
+func containerCPU() (dockerDrawer, ui.GridBufferer) {
 	cpus := ui.NewSparklines()
-	cpus.Border.Label = "CPU"
+	cpus.BorderLabel = "CPU"
 	return func(dc *dockerclient.DockerClient) {
 		cpus.Lines = []ui.Sparkline{}
 		cpus.Height = 2
@@ -190,9 +189,9 @@ func ContainerCpu() (DockerDrawer, ui.GridBufferer) {
 	}, cpus
 }
 
-func ContainerNetworkBytes(lbl string, differ NetworkDiffer, color ui.Attribute) (DockerDrawer, ui.GridBufferer) {
+func containerNetworkBytes(lbl string, differ networkDiffer, color ui.Attribute) (dockerDrawer, ui.GridBufferer) {
 	netw := ui.NewSparklines()
-	netw.Border.Label = lbl
+	netw.BorderLabel = lbl
 	return func(dc *dockerclient.DockerClient) {
 		netw.Lines = []ui.Sparkline{}
 		netw.Height = 2
@@ -216,9 +215,9 @@ func ContainerNetworkBytes(lbl string, differ NetworkDiffer, color ui.Attribute)
 	}, netw
 }
 
-func ContainerPercentMemory() (DockerDrawer, ui.GridBufferer) {
+func containerPercentMemory() (dockerDrawer, ui.GridBufferer) {
 	mem := ui.NewBarChart()
-	mem.Border.Label = "Memory % usage "
+	mem.BorderLabel = "Memory % usage "
 	mem.Height = 13
 	mem.BarWidth = 5
 	mem.SetMax(100)
@@ -242,10 +241,10 @@ func ContainerPercentMemory() (DockerDrawer, ui.GridBufferer) {
 	}, mem
 }
 
-func ContainerValueMemory() (DockerDrawer, ui.GridBufferer) {
+func containerValueMemory() (dockerDrawer, ui.GridBufferer) {
 	list := ui.NewList()
 	list.ItemFgColor = ui.ColorYellow
-	list.Border.Label = "Container Memory"
+	list.BorderLabel = "Container Memory"
 
 	return func(dc *dockerclient.DockerClient) {
 		var labels []string
@@ -265,7 +264,7 @@ func ContainerValueMemory() (DockerDrawer, ui.GridBufferer) {
 
 func genCPUSystemUsage(stats []*dockerclient.Stats) []int {
 	var res []int
-	for i, _ := range stats {
+	for i := range stats {
 		if i > 0 {
 			res = append(res, cpuPercent(stats, i))
 		}
@@ -273,9 +272,9 @@ func genCPUSystemUsage(stats []*dockerclient.Stats) []int {
 	return res
 }
 
-func genNetwork(stats []*dockerclient.Stats, differ NetworkDiffer) []int {
+func genNetwork(stats []*dockerclient.Stats, differ networkDiffer) []int {
 	var res []int
-	for i, _ := range stats {
+	for i := range stats {
 		if i > 0 {
 			stat1 := stats[i]
 			stat2 := stats[i-1]
@@ -342,20 +341,20 @@ func main() {
 		panic(err)
 	}
 
-	var drawers []DockerDrawer
-	containerlist, uiCntList := ContainerList()
-	containerDetails, uiCntDets := ContainerDetails()
-	cpuList, uiCpus := ContainerCpu()
-	memUsg, uiMem := ContainerPercentMemory()
-	memVal, uiMemVal := ContainerValueMemory()
-	rxVal, uiRx := ContainerNetworkBytes("Rx Bytes", rxDiffer, ui.ColorGreen)
-	txVal, uiTx := ContainerNetworkBytes("Tx Bytes", txDiffer, ui.ColorBlue)
+	var drawers []dockerDrawer
+	containerlist, uiCntList := containerList()
+	containerDetails, uiCntDets := containerDetails()
+	cpuList, uiCpus := containerCPU()
+	memUsg, uiMem := containerPercentMemory()
+	memVal, uiMemVal := containerValueMemory()
+	rxVal, uiRx := containerNetworkBytes("Rx Bytes", rxDiffer, ui.ColorGreen)
+	txVal, uiTx := containerNetworkBytes("Tx Bytes", txDiffer, ui.ColorBlue)
 
 	drawers = append(drawers, containerlist, containerDetails, cpuList, memUsg, memVal, rxVal, txVal)
 
 	title := ui.NewPar(fmt.Sprintf("dockmon %s ('q' to quit panel)", version))
 	title.Height = 3
-	title.HasBorder = true
+	title.Border = true
 
 	mainGrid := mainPanel(title, uiCntList, uiCpus, uiMem, uiMemVal, uiRx, uiTx)
 	detailsGrid := detailsPanel(title, uiCntDets)
@@ -364,34 +363,34 @@ func main() {
 	ui.Body.Width = ui.TermWidth()
 	ui.Body.Align()
 
-	evt := ui.EventCh()
+	//ui.Render(ui)
 
-	for {
-		select {
-		case e := <-evt:
-			if e.Type == ui.EventKey && e.Ch == 'q' {
-				_, err := popPanel()
-				if err != nil {
-					return
-				}
+	ui.Handle("/sys/kbd/", func(evt ui.Event) {
+		ch := evt.Data.(ui.EvtKbd)
+		key := ch.KeyStr[0]
+		if key == 'q' {
+			_, err := popPanel()
+			if err != nil {
+				ui.StopLoop()
 			}
-			if e.Type == ui.EventKey && e.Ch >= '0' && e.Ch <= '9' {
-				containerDetailsIndex = int(e.Ch - '0')
-				pushPanel(detailsGrid)
-			}
-			if e.Type == ui.EventResize {
-				ui.Body.Width = ui.TermWidth()
-				ui.Body.Align()
-			}
-		default:
-			for _, d := range drawers {
-				d(docker)
-			}
-			ui.Body.Align()
-			ui.Render(ui.Body)
-			time.Sleep(time.Second / 2)
 		}
-	}
+		if key >= '0' && key <= '9' {
+			containerDetailsIndex = int(key - '0')
+			pushPanel(detailsGrid)
+		}
+	})
+	ui.Handle("/timer/1s", func(e ui.Event) {
+		for _, d := range drawers {
+			d(docker)
+		}
+		ui.Body.Align()
+		ui.Render(ui.Body)
+	})
+	ui.Handle("/sys/wnd/resize", func(e ui.Event) {
+		ui.Body.Width = ui.TermWidth()
+		ui.Body.Align()
+	})
+	ui.Loop()
 }
 
 func pushPanel(p *ui.Grid) *ui.Grid {
