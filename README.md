@@ -13,7 +13,8 @@ Container Details:
 
 ## Installation
 
-[gb](http://getgb.io) is needed for building. Clone this repository and do a `gb build`.
+`go get github.com/ulrichSchreiner/dockmon`
+
 
 ## Limitations
 

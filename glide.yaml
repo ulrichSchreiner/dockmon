@@ -1,0 +1,43 @@
+package: github.com/ulrichSchreiner/dockmon
+import:
+- package: github.com/davecgh/go-spew
+  version: 5215b55f46b2b919f50a1df0eaa5886afe4e3b3d
+  repo: https://github.com/davecgh/go-spew
+  subpackages:
+  - spew
+- package: github.com/docker/docker
+  version: ef424c108a90a04e9c5b0bd48b9047054a6a798b
+  repo: https://github.com/docker/docker
+  subpackages:
+  - pkg/units
+- package: github.com/gizak/termui
+  version: a302a528a807232d794aabb0479ab14a6ac601a8
+  repo: https://github.com/gizak/termui
+- package: github.com/mattn/go-runewidth
+  version: 12e0ff74603c9a3209d8bf84f8ab349fe1ad9477
+  repo: https://github.com/mattn/go-runewidth
+- package: github.com/nsf/termbox-go
+  version: da190e1fe57cb6bc60a3d9d407533d944c7c450d
+  repo: https://github.com/nsf/termbox-go
+- package: github.com/pmezard/go-difflib
+  version: d8ed2627bdf02c080bf22230dbb337003b7aba2d
+  repo: https://github.com/pmezard/go-difflib
+  subpackages:
+  - difflib
+- package: github.com/samalba/dockerclient
+  version: 82381805d3533c97cec74e1cc79b00ef45774571
+  repo: https://github.com/samalba/dockerclient
+- package: github.com/stretchr/objx
+  version: 1a9d0bb9f541897e62256577b352fdbc1fb4fd94
+  repo: https://github.com/stretchr/objx
+- package: github.com/stretchr/testify
+  version: 67106a5111a06241c8d84952c33214675f51a34a
+  repo: https://github.com/stretchr/testify
+  subpackages:
+  - assert
+  - mock
+- package: golang.org/x/net
+  version: 1d9fd3b8333e891c0e7353e1adcfe8a612573033
+  repo: https://go.googlesource.com/net
+  subpackages:
+  - websocket

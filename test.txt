@@ -1,0 +1,15 @@
+panic: runtime error: index out of range
+
+goroutine 3 [running]:
+panic(0x660d60, 0xc42000c160)
+	/usr/local/go/src/runtime/panic.go:500 +0x1a1
+main.findMaxInt(0x0, 0x0, 0x0, 0x40)
+	/home/usc/development/src/github.com/ulrichSchreiner/dockmon/main.go:336 +0x4f
+main.containerPercentMemory.func1(0xc42007f4d0)
+	/home/usc/development/src/github.com/ulrichSchreiner/dockmon/main.go:241 +0x42c
+main.main.func2(0x6ace07, 0x5, 0xc42007b880, 0x9, 0x6ace07, 0x5, 0x0, 0x0, 0x6714e0, 0xc42007b890, ...)
+	/home/usc/development/src/github.com/ulrichSchreiner/dockmon/main.go:400 +0x5d
+github.com/ulrichSchreiner/dockmon/vendor/github.com/gizak/termui.(*EvtStream).Loop.func1(0xc4200740a0, 0x6ace07, 0x5, 0xc42007b880, 0x9, 0x6ace07, 0x5, 0x0, 0x0, 0x6714e0, ...)
+	/home/usc/development/src/github.com/ulrichSchreiner/dockmon/vendor/github.com/gizak/termui/events.go:247 +0xfd
+created by github.com/ulrichSchreiner/dockmon/vendor/github.com/gizak/termui.(*EvtStream).Loop
+	/home/usc/development/src/github.com/ulrichSchreiner/dockmon/vendor/github.com/gizak/termui/events.go:249 +0x167
